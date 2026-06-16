@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coffee Shop — Stock Take</title>
+<style>
+  :root {
+    --bg: #faf9f7; --surface: #ffffff; --border: #e8e4dc; --border-strong: #ccc8be;
+    --text: #1a1a18; --text-muted: #6b6b65; --text-faint: #a8a49c;
+    --accent: #3d2b1f; --accent-light: #f0e8e0;
+    --green: #1a6b3a; --green-bg: #edf7f1; --green-border: #a3d4b4;
+    --red: #a32020; --red-bg: #fdf0f0; --red-border: #f0a8a8;
+    --amber: #7a4f00; --amber-bg: #fff8ec; --amber-border: #f0d080;
+    --radius: 8px; --radius-lg: 12px; --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .app-header { background: var(--accent); color: #fff; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .app-header-left { display: flex; align-items: center; gap: 14px; }
+  .app-logo { height: 40px; width: auto; border-radius: 6px; object-fit: contain; display: block; }
+  .app-logo-placeholder { height: 40px; width: 40px; border-radius: 6px; background: rgba(255,255,255,0.15); border: 1.5px dashed rgba(255,255,255,0.4); display: flex; align-items: center; justify-content: center; font-size: 10px; color: rgba(255,255,255,0.5); text-align: center; line-height: 1.2; cursor: default; flex-shrink: 0; }
+  .app-header h1 { font-size: 16px; font-weight: 600; letter-spacing: 0.02em; }
+  .app-header .date-chip { font-size: 12px; opacity: 0.65; flex-shrink: 0; }
+  .nav { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; overflow-x: auto; }
+  .nav-btn { padding: 11px 16px; font-size: 13px; border: none; background: none; cursor: pointer; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; font-weight: 500; white-space: nowrap; }
+  .nav-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .nav-btn:hover:not(.active) { color: var(--text); }
+  .main { max-width: 860px; margin: 0 auto; padding: 20px 16px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow); }
+  .card-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); margin-bottom: 14px; }
+
+  label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500; }
+  select, input[type=number], input[type=text], input[type=date], input[type=time] {
+    width: 100%; padding: 8px 11px; font-size: 14px;
+    border: 1px solid var(--border-strong); border-radius: var(--radius);
+    background: var(--surface); color: var(--text); transition: border-color .15s;
+  }
+  select:focus, input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(61,43,31,0.08); }
+  .field { margin-bottom: 14px; }
+
+  .type-row { display: flex; gap: 8px; }
+  .type-btn { flex: 1; padding: 8px; border: 1px solid var(--border-strong); border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s; }
+  .type-btn.out-idle   { background: #fff0f0; color: #c44; border-color: var(--red-border); opacity: 0.55; }
+  .type-btn.in-idle    { background: #f0faf4; color: #2a7a50; border-color: var(--green-border); opacity: 0.55; }
+  .type-btn.out-active { background: var(--red-bg); color: var(--red); border-color: var(--red-border); opacity: 1; box-shadow: 0 0 0 2px rgba(163,32,32,0.15); }
+  .type-btn.in-active  { background: var(--green-bg); color: var(--green); border-color: var(--green-border); opacity: 1; box-shadow: 0 0 0 2px rgba(26,107,58,0.15); }
+
+  .qty-row { display: flex; gap: 8px; align-items: center; }
+  .qty-adj { width: 36px; height: 36px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--bg); color: var(--text); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .qty-adj:hover { background: var(--border); }
+  input#qty { flex: 1; text-align: center; font-size: 20px; font-weight: 600; }
+
+  .submit-btn { width: 100%; padding: 10px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius); font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 2px; }
+  .submit-btn:hover { opacity: 0.88; }
+
+  .toolbar { display: flex; gap: 8px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
+  .search-input { flex: 1; min-width: 140px; padding: 8px 11px; font-size: 14px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); }
+  .search-input:focus { outline: none; border-color: var(--accent); }
+  .tool-btn { padding: 8px 13px; font-size: 12px; font-weight: 500; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text-muted); cursor: pointer; white-space: nowrap; }
+  .tool-btn:hover { background: var(--bg); color: var(--text); }
+
+  .inv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .inv-table th { text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); border-bottom: 1px solid var(--border); background: var(--bg); }
+  .inv-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .inv-table tr:last-child td { border-bottom: none; }
+  .inv-table tbody tr:hover td { background: var(--bg); }
+  .cat-row td { background: var(--bg); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); padding: 6px 10px; border-bottom: 1px solid var(--border); }
+
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 12px; font-weight: 600; min-width: 48px; text-align: center; }
+  .badge-pos  { background: var(--green-bg); color: var(--green); }
+  .badge-zero { background: var(--bg); color: var(--text-faint); border: 1px solid var(--border); }
+  .badge-neg  { background: var(--red-bg); color: var(--red); }
+  .badge-warn { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+
+  .row-actions { display: flex; gap: 4px; justify-content: flex-end; }
+  .icon-btn { width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); transition: all .12s; }
+  .icon-btn:hover { border-color: var(--border-strong); color: var(--text); background: var(--bg); }
+  .icon-btn.del:hover { border-color: var(--red-border); color: var(--red); background: var(--red-bg); }
+
+  .alert-panel { border-radius: var(--radius-lg); border: 1px solid var(--red-border); background: var(--red-bg); padding: 12px 14px; margin-bottom: 14px; }
+  .alert-panel h3 { font-size: 12px; font-weight: 600; color: var(--red); margin-bottom: 7px; }
+  .alert-list { display: flex; flex-wrap: wrap; gap: 5px; }
+  .alert-chip { font-size: 11px; padding: 2px 9px; background: var(--surface); border: 1px solid var(--red-border); border-radius: 20px; color: var(--red); }
+
+  /* History */
+  .hist-toolbar { display: flex; gap: 8px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
+  .hist-filter { padding: 7px 11px; font-size: 13px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); color: var(--text); min-width: 140px; }
+  .day-group { margin-bottom: 18px; }
+  .day-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-faint); margin-bottom: 6px; padding-bottom: 5px; border-bottom: 1px solid var(--border); }
+  .log-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); gap: 8px; }
+  .log-row:last-child { border-bottom: none; }
+  .log-name { font-size: 13px; color: var(--text); font-weight: 500; }
+  .log-meta { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+  .log-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .log-qty { font-size: 13px; font-weight: 700; min-width: 38px; text-align: right; }
+  .log-qty.out { color: var(--red); }
+  .log-qty.in  { color: var(--green); }
+  .log-qty.edit { color: var(--amber); }
+
+  /* Settings */
+  .section-head { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin: 18px 0 8px; }
+  .section-head:first-child { margin-top: 0; }
+  .settings-grid { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); gap: 8px; }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-label { font-size: 13px; color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .setting-inputs { display: flex; gap: 6px; align-items: flex-end; flex-shrink: 0; }
+  .setting-inputs > div { text-align: center; }
+  .setting-inputs input { width: 64px; padding: 4px 6px; font-size: 12px; border: 1px solid var(--border-strong); border-radius: 6px; text-align: center; }
+  .setting-inputs label { font-size: 10px; color: var(--text-faint); white-space: nowrap; margin-bottom: 3px; }
+  .save-btn { padding: 9px 18px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .save-btn:hover { opacity: 0.88; }
+
+  /* Toast */
+  .toast { position: fixed; top: 64px; left: 50%; transform: translateX(-50%) translateY(-8px); padding: 13px 24px; border-radius: var(--radius-lg); font-size: 15px; font-weight: 600; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 9999; box-shadow: 0 4px 20px rgba(0,0,0,0.15); white-space: nowrap; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.ok   { background: var(--green); color: #fff; }
+  .toast.err  { background: var(--red);   color: #fff; }
+  .toast.warn { background: var(--amber); color: #fff; }
+
+  .empty { text-align: center; padding: 2.5rem; color: var(--text-faint); font-size: 14px; }
+
+  /* ── Modals ─────────────────────────────────────────────────────────── */
+  .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(20,15,10,0.5); z-index: 200; align-items: center; justify-content: center; padding: 16px; }
+  .modal-backdrop.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: 0 8px 32px rgba(0,0,0,0.2); width: 100%; max-width: 460px; padding: 22px; animation: min .16s ease; max-height: 90vh; overflow-y: auto; }
+  @keyframes min { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .modal-title { font-size: 15px; font-weight: 600; }
+  .modal-close { width: 28px; height: 28px; border: 1px solid var(--border-strong); border-radius: 6px; background: none; cursor: pointer; font-size: 16px; color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
+  .modal-close:hover { background: var(--bg); }
+  .modal-footer { display: flex; gap: 8px; margin-top: 18px; }
+  .modal-footer .cancel-btn { flex: 1; padding: 9px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: none; color: var(--text-muted); font-size: 13px; font-weight: 500; cursor: pointer; }
+  .modal-footer .cancel-btn:hover { background: var(--bg); }
+  .modal-footer .confirm-btn { flex: 2; padding: 9px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .modal-footer .confirm-btn:hover { opacity: 0.88; }
+  .modal-footer .danger-btn { flex: 1; padding: 9px; background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); border-radius: var(--radius); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .modal-footer .danger-btn:hover { opacity: 0.85; }
+  .field-error { font-size: 12px; color: var(--red); margin-top: 3px; display: none; }
+  .field-error.show { display: block; }
+  input.error, select.error { border-color: var(--red); }
+  .new-cat-field { display: none; margin-top: 8px; }
+  .new-cat-field.show { display: block; }
+  .hint { font-size: 11px; color: var(--text-faint); margin-top: 4px; }
+  .save-reminder { display:flex; align-items:center; gap:9px; background:var(--red-bg); border:1px solid var(--red-border); border-radius:var(--radius); padding:10px 13px; margin-top:14px; font-size:13px; font-weight:600; color:var(--red); }
+  .save-reminder::before { content:"⚠"; font-size:15px; flex-shrink:0; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-5px)} 40%{transform:translateX(5px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+  .save-reminder.shake { animation: shake .35s ease; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+  .edit-note { font-size: 12px; color: var(--amber); background: var(--amber-bg); border: 1px solid var(--amber-border); border-radius: 6px; padding: 7px 10px; margin-bottom: 14px; }
+
+  @media (max-width: 540px) {
+    .main { padding: 14px 10px; }
+    .two-col, .three-col { grid-template-columns: 1fr; }
+    .nav-btn { padding: 10px 11px; font-size: 12px; }
+    .setting-inputs { flex-direction: column; gap: 4px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div class="app-header-left">
+    <img src="logo.png" alt="Logo" class="app-logo" id="logo-img" onerror="this.style.display='none';document.getElementById('logo-placeholder').style.display='flex'">
+    <div class="app-logo-placeholder" id="logo-placeholder" style="display:none" title="Add logo.png to the same folder as this file">Logo</div>
+    <h1>Coffee Shop — Stock Take</h1>
+  </div>
+  <span class="date-chip" id="header-date"></span>
+</div>
+<nav class="nav">
+  <button class="nav-btn active" onclick="showTab('log')">Log stock</button>
+  <button class="nav-btn" onclick="showTab('inventory')">Inventory</button>
+  <button class="nav-btn" onclick="showTab('history')">History</button>
+  <button class="nav-btn" onclick="showTab('settings')">Settings</button>
+</nav>
+
+<div class="main">
+
+  <!-- ── LOG TAB ── -->
+  <div id="tab-log">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div class="card-title" style="margin-bottom:0">New entry</div>
+        <button class="tool-btn" onclick="openModal_addProduct()">+ Add product</button>
+      </div>
+
+      <div class="field">
+        <label>Item</label>
+        <select id="item-select"></select>
+      </div>
+      <div class="field">
+        <label>Movement</label>
+        <div class="type-row">
+          <button class="type-btn out-active" id="btn-out" onclick="setType('out')">↑ Taken out</button>
+          <button class="type-btn in-idle" id="btn-in" onclick="setType('in')">↓ Added in</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Quantity</label>
+        <div class="qty-row">
+          <button class="qty-adj" onclick="adj(-1)">−</button>
+          <input type="number" id="qty" value="1" min="1">
+          <button class="qty-adj" onclick="adj(1)">+</button>
+        </div>
+      </div>
+      <button class="submit-btn" onclick="logEntry()">✓ Confirm entry</button>
+    </div>
+  </div>
+
+  <!-- ── INVENTORY TAB ── -->
+  <div id="tab-inventory" style="display:none">
+    <div id="low-stock-panel" style="display:none" class="alert-panel">
+      <h3>⚠ Low stock</h3>
+      <div class="alert-list" id="low-stock-list"></div>
+    </div>
+    <div class="toolbar">
+      <input class="search-input" type="text" placeholder="Search items…" oninput="renderInventory()">
+      <button class="tool-btn" onclick="exportCSV()">⬇ Export CSV</button>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="inv-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th style="text-align:right">Qty</th>
+            <th style="text-align:right">Out</th>
+            <th style="text-align:right">In</th>
+            <th style="text-align:right">Alert</th>
+            <th style="text-align:right;padding-right:14px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="inv-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── HISTORY TAB ── -->
+  <div id="tab-history" style="display:none">
+    <div class="hist-toolbar">
+      <input class="search-input" type="text" id="hist-search" placeholder="Search item name…" oninput="renderHistory()">
+      <select class="hist-filter" id="hist-type" onchange="renderHistory()">
+        <option value="">All movements</option>
+        <option value="out">Taken out only</option>
+        <option value="in">Added in only</option>
+        <option value="edit">Edits only</option>
+      </select>
+    </div>
+    <div class="card" id="history-card">
+      <div class="empty">No entries yet</div>
+    </div>
+  </div>
+
+  <!-- ── SETTINGS TAB ── -->
+  <div id="tab-settings" style="display:none">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap">
+        <div class="card-title" style="margin-bottom:0">Opening quantities &amp; alert thresholds</div>
+        <button class="save-btn" onclick="saveSettings()">Save settings</button>
+      </div>
+      <div id="settings-unsaved" style="display:none;align-items:center;gap:9px;background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:var(--radius);padding:9px 13px;margin-bottom:12px;font-size:13px;font-weight:600;color:var(--amber)">
+        <span style="font-size:15px;flex-shrink:0">&#9888;</span> Unsaved changes — click <strong>Save settings</strong> above before leaving.
+      </div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Set on-hand stock and low-stock alert thresholds. Changes here create an audit log entry.</p>
+      <div id="settings-body" oninput="showUnsavedWarning()"></div>
+    </div>
+    <div class="card" style="border-color:var(--red-border)">
+      <div class="card-title" style="color:var(--red)">Danger zone</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Clear all log entries and reset quantities to zero.</p>
+      <button onclick="resetAll()" style="padding:8px 14px;font-size:13px;font-weight:600;border:1px solid var(--red-border);border-radius:var(--radius);background:var(--red-bg);color:var(--red);cursor:pointer">Reset all data</button>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<div class="toast" id="toast"></div>
+
+<!-- ════════════════════════════════════════════════
+     MODAL: Add product
+═══════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="modal-add-product" onclick="handleBdClick(event,'modal-add-product')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-ap-title">
+    <div class="modal-header">
+      <span class="modal-title" id="m-ap-title">Add new product</span>
+      <button class="modal-close" onclick="closeModal('add-product')" aria-label="Close">×</button>
+    </div>
+    <div class="field">
+      <label>Product name</label>
+      <input type="text" id="ap-name" placeholder="e.g. Oat milk 1L" autocomplete="off" oninput="clearFErr('ap-name','err-ap-name')">
+      <div class="field-error" id="err-ap-name"></div>
+    </div>
+    <div class="field">
+      <label>Category</label>
+      <select id="ap-cat" onchange="handleAPCatChange()">
+        <option value="">— Choose a category</option>
+      </select>
+      <div class="field-error" id="err-ap-cat"></div>
+    </div>
+    <div class="new-cat-field" id="ap-newcat-wrap">
+      <div class="field" style="margin-bottom:0">
+        <label>New category name</label>
+        <input type="text" id="ap-newcat" placeholder="e.g. Syrups" autocomplete="off" oninput="clearFErr('ap-newcat','err-ap-newcat')">
+        <div class="field-error" id="err-ap-newcat"></div>
+      </div>
+    </div>
+    <div class="two-col" style="margin-top:14px">
+      <div class="field" style="margin-bottom:0">
+        <label>Opening quantity</label>
+        <input type="number" id="ap-qty" value="0" min="0" step="1">
+        <div class="hint">Current on-hand stock</div>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Low-stock alert at</label>
+        <input type="number" id="ap-thr" value="0" min="0" step="1">
+        <div class="hint">0 = no alert</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="cancel-btn" onclick="closeModal('add-product')">Cancel</button>
+      <button class="confirm-btn" onclick="confirmAddProduct()">Add product</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════
+     MODAL: Edit product
+═══════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="modal-edit-product" onclick="handleBdClick(event,'modal-edit-product')">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <span class="modal-title">Edit product</span>
+      <button class="modal-close" onclick="modalDirty['ep'] ? showModalReminder('ep') : closeModal('edit-product')" aria-label="Close">×</button>
+    </div>
+    <div class="edit-note">⚠ Renaming a product does not update its history entries. A correction log entry will be created.</div>
+    <div class="field">
+      <label>Product name</label>
+      <input type="text" id="ep-name" autocomplete="off" oninput="clearFErr('ep-name','err-ep-name');showModalReminder('ep')">
+      <div class="field-error" id="err-ep-name"></div>
+    </div>
+    <div class="field">
+      <label>Category</label>
+      <select id="ep-cat" onchange="handleEPCatChange();showModalReminder('ep')">
+        <option value="">— Choose a category</option>
+      </select>
+    </div>
+    <div class="new-cat-field" id="ep-newcat-wrap">
+      <div class="field" style="margin-bottom:0">
+        <label>New category name</label>
+        <input type="text" id="ep-newcat" placeholder="e.g. Syrups" autocomplete="off">
+        <div class="field-error" id="err-ep-newcat"></div>
+      </div>
+    </div>
+    <hr class="divider">
+    <div class="two-col">
+      <div class="field" style="margin-bottom:0">
+        <label>Current quantity</label>
+        <input type="number" id="ep-qty" min="0" step="1" oninput="showModalReminder('ep')">
+        <div class="hint">Directly sets stock level</div>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Low-stock alert at</label>
+        <input type="number" id="ep-thr" min="0" step="1" oninput="showModalReminder('ep')">
+        <div class="hint">0 = no alert</div>
+      </div>
+    </div>
+    <div id="ep-save-reminder" class="save-reminder" style="display:none">Unsaved changes — save before closing or your edits will be lost.</div>
+    <div class="modal-footer">
+      <button class="danger-btn" onclick="confirmDeleteProduct()">Delete</button>
+      <button class="cancel-btn" onclick="modalDirty['ep'] ? showModalReminder('ep') : closeModal('edit-product')">Cancel</button>
+      <button class="confirm-btn" onclick="confirmEditProduct()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════
+     MODAL: Edit history entry
+═══════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="modal-edit-entry" onclick="handleBdClick(event,'modal-edit-entry')">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <span class="modal-title">Edit log entry</span>
+      <button class="modal-close" onclick="modalDirty['ee'] ? showModalReminder('ee') : closeModal('edit-entry')" aria-label="Close">×</button>
+    </div>
+    <div class="edit-note">Editing creates a correction record in the audit trail.</div>
+    <div class="field">
+      <label>Item</label>
+      <input type="text" id="ee-item" readonly style="background:var(--bg);color:var(--text-muted)">
+    </div>
+    <div class="field">
+      <label>Movement</label>
+      <div class="type-row">
+        <button class="type-btn out-idle" id="ee-btn-out" onclick="setEEType('out');showModalReminder('ee')">↑ Taken out</button>
+        <button class="type-btn in-idle" id="ee-btn-in"  onclick="setEEType('in');showModalReminder('ee')">↓ Added in</button>
+      </div>
+    </div>
+    <div class="three-col">
+      <div class="field" style="margin-bottom:0">
+        <label>Quantity</label>
+        <input type="number" id="ee-qty" min="1" step="1" oninput="showModalReminder('ee')">
+        <div class="field-error" id="err-ee-qty"></div>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Date</label>
+        <input type="date" id="ee-date" onchange="showModalReminder('ee')">
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Time</label>
+        <input type="time" id="ee-time" onchange="showModalReminder('ee')">
+      </div>
+    </div>
+    <div id="ee-save-reminder" class="save-reminder" style="display:none">Unsaved changes — save before closing or your edits will be lost.</div>
+    <div class="modal-footer">
+      <button class="danger-btn" onclick="confirmDeleteEntry()">Delete</button>
+      <button class="cancel-btn" onclick="modalDirty['ee'] ? showModalReminder('ee') : closeModal('edit-entry')">Cancel</button>
+      <button class="confirm-btn" onclick="confirmEditEntry()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Baseline product list ────────────────────────────────────────────────────
+const CATEGORIES = {
+  "Alternative milk": ["Macadamia","Almond","Oat"],
+  "Juice": ["Oasis water still","Oasis water sparkling","Oasis Litchi 250ml","Oasis Orange 250ml","Oasis Strawberry 250ml","Oasis Mixed fruit 250ml"],
+  "Kombucha": ["Kombucha Blueberry","Kombucha Lemon ginger"],
+  "Pantry": ["Serviettes","Apple slices tin","Pear slices tin","Pineapple slices tin","Condensed milk","Canderel","Brown sugar","White sugar"],
+  "Coffee & Tea": ["Redespresso","Five Roses","Rooibos","Decaf 1kg","Pie Blend 1kg","Small bags","Spiced chai","Loose leaf tea","Espresso cleaner","Multipurpose wipe"],
+  "Packaging — bags": ["Clear bag 130x140","Clear bag 150x250","Clear bags 200x300","Clear bag 76x54x216","Clear bag 83x54x270","Clear bag 120x44x235","Brown bag 4","Brown bag 12","Brown bag 16","Brown bag baguette"],
+  "Packaging — boxes & cups": ["Boxes 6x6x2","Boxes 9x9x3","Mince pie containers","Disposable piping bags 530x270","Cup holder 2","Cup holder 4","Straws","350ml lid","250ml lid","350ml cup","250ml cup"],
+  "Lizzard": ["Travel cup 360","Travel cup 480","Tumbler 350","Tumbler 240","Flask 415","Flask 530","Kids cup","Plunger","Koppie"],
+  "Aeropress": ["Aeropress XL","Aeropress Normal","Filter papers aeropress","Filter paper","Stainless steel filter"],
+  "Bialetti": ["Bialetti 6cup","Bialetti 3cup","Bialetti 6cup gasket","Bialetti 3cup gasket"],
+  "Equipment": ["Weaco scale"]
+};
+
+const ORIGINAL_ITEMS = Object.values(CATEGORIES).flat();
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let db = { inventory: {}, log: [] };
+let moveType = 'out';
+let editingProductName = null;   // for edit-product modal
+let editingEntryIndex  = null;   // for edit-entry modal
+let eeType = 'out';              // type inside edit-entry modal
+
+// ─── Persistence ─────────────────────────────────────────────────────────────
+function loadDB() {
+  try {
+    const raw = localStorage.getItem('coffee-stocktake-v3');
+    if (raw) {
+      db = JSON.parse(raw);
+      if (db.customCategories) {
+        Object.entries(db.customCategories).forEach(([cat, items]) => {
+          if (!CATEGORIES[cat]) CATEGORIES[cat] = [];
+          items.forEach(i => { if (!CATEGORIES[cat].includes(i)) CATEGORIES[cat].push(i); });
+        });
+      }
+    }
+  } catch(e) {}
+}
+
+function saveDB() {
+  try {
+    const customCategories = {};
+    Object.entries(CATEGORIES).forEach(([cat, items]) => {
+      const extras = items.filter(i => !ORIGINAL_ITEMS.includes(i));
+      if (extras.length) customCategories[cat] = extras;
+    });
+    db.customCategories = customCategories;
+    localStorage.setItem('coffee-stocktake-v3', JSON.stringify(db));
+  } catch(e) {}
+}
+
+function getItem(name) {
+  if (!db.inventory[name]) db.inventory[name] = { qty: 0, totalOut: 0, totalIn: 0, threshold: 0 };
+  return db.inventory[name];
+}
+
+// ─── Time helpers ─────────────────────────────────────────────────────────────
+function todayStr()  { return new Date().toISOString().slice(0,10); }
+function nowTimeStr(){ return new Date().toTimeString().slice(0,5); }
+
+function fmtDate(s) {
+  const d = new Date(s + 'T00:00:00');
+  return d.toLocaleDateString('en-ZA', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+}
+
+function fmtTime(s) {
+  if (!s) return '';
+  // s is "HH:MM"
+  const [h, m] = s.split(':').map(Number);
+  const ampm = h >= 12 ? 'pm' : 'am';
+  const h12  = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+
+function fmtDateTime(entry) {
+  const parts = [fmtDate(entry.date)];
+  if (entry.time) parts.push(fmtTime(entry.time));
+  return parts.join(' · ');
+}
+
+// ─── Toast ───────────────────────────────────────────────────────────────────
+function toast(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast ' + type + ' show';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className = 'toast', 2600);
+}
+
+// ─── Modal helpers ────────────────────────────────────────────────────────────
+function openModal(name) {
+  document.getElementById('modal-' + name).classList.add('open');
+}
+function closeModal(name) {
+  document.getElementById('modal-' + name).classList.remove('open');
+}
+function handleBdClick(e, name) {
+  if (e.target === document.getElementById('modal-' + name)) {
+    const prefix = name === 'edit-product' ? 'ep' : name === 'edit-entry' ? 'ee' : null;
+    if (prefix && modalDirty[prefix]) {
+      showModalReminder(prefix);  // hard stop — don't close
+    } else {
+      closeModal(name);
+    }
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (document.getElementById('modal-edit-product').classList.contains('open')) {
+      if (modalDirty['ep']) { showModalReminder('ep'); }
+      else closeModal('edit-product');
+    } else if (document.getElementById('modal-edit-entry').classList.contains('open')) {
+      if (modalDirty['ee']) { showModalReminder('ee'); }
+      else closeModal('edit-entry');
+    } else {
+      closeModal('add-product');
+    }
+  }
+});
+
+function clearFErr(inputId, errId) {
+  document.getElementById(inputId)?.classList.remove('error');
+  const el = document.getElementById(errId);
+  if (el) { el.textContent = ''; el.classList.remove('show'); }
+}
+function showFErr(inputId, errId, msg) {
+  document.getElementById(inputId)?.classList.add('error');
+  const el = document.getElementById(errId);
+  if (el) { el.textContent = msg; el.classList.add('show'); }
+  document.getElementById(inputId)?.focus();
+  return false;
+}
+
+// ─── Item select ─────────────────────────────────────────────────────────────
+function initSelect() {
+  const sel = document.getElementById('item-select');
+  const cur = sel.value;
+  sel.innerHTML = '';
+  Object.entries(CATEGORIES).forEach(([cat, items]) => {
+    if (!items.length) return;
+    const og = document.createElement('optgroup');
+    og.label = '— ' + cat;
+    items.forEach(name => {
+      const o = document.createElement('option');
+      o.value = o.textContent = name;
+      og.appendChild(o);
+    });
+    sel.appendChild(og);
+  });
+  if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
+}
+
+// ─── Category dropdowns for modals ───────────────────────────────────────────
+function populateCatSelect(selId, selectedCat) {
+  const sel = document.getElementById(selId);
+  sel.innerHTML = '<option value="">— Choose a category</option>';
+  Object.keys(CATEGORIES).forEach(cat => {
+    const o = document.createElement('option');
+    o.value = o.textContent = cat;
+    if (cat === selectedCat) o.selected = true;
+    sel.appendChild(o);
+  });
+  const newOpt = document.createElement('option');
+  newOpt.value = '__new__'; newOpt.textContent = '+ Create new category…';
+  sel.appendChild(newOpt);
+}
+
+// ─── Log entry ───────────────────────────────────────────────────────────────
+function setType(t) {
+  moveType = t;
+  document.getElementById('btn-out').className = 'type-btn ' + (t === 'out' ? 'out-active' : 'out-idle');
+  document.getElementById('btn-in').className  = 'type-btn ' + (t === 'in'  ? 'in-active'  : 'in-idle');
+}
+
+function adj(d) {
+  const el = document.getElementById('qty');
+  el.value = Math.max(1, parseInt(el.value || 1) + d);
+}
+
+function logEntry() {
+  const item = document.getElementById('item-select').value;
+  const qty  = parseInt(document.getElementById('qty').value) || 0;
+  if (!qty || qty < 1) { toast('Enter a valid quantity', 'err'); return; }
+
+  const d = getItem(item);
+  if (moveType === 'out') { d.qty -= qty; d.totalOut = (d.totalOut||0) + qty; }
+  else                    { d.qty += qty; d.totalIn  = (d.totalIn||0)  + qty; }
+
+  db.log.unshift({ item, type: moveType, qty, date: todayStr(), time: nowTimeStr(), ts: Date.now() });
+  saveDB();
+
+  const thr  = d.threshold || 0;
+  const warn = thr > 0 && d.qty <= thr ? ` ⚠ low stock (${d.qty} left)` : '';
+  toast((moveType === 'out' ? '−' : '+') + qty + ' ' + item + warn, warn ? 'warn' : 'ok');
+
+  document.getElementById('qty').value = 1;
+  renderInventory();
+  renderHistory();
+}
+
+// ─── Inventory ───────────────────────────────────────────────────────────────
+function renderInventory() {
+  const search   = (document.querySelector('#tab-inventory .search-input')?.value || '').toLowerCase();
+  const tbody    = document.getElementById('inv-body');
+  const lowItems = [];
+  let html = '';
+
+  Object.entries(CATEGORIES).forEach(([cat, items]) => {
+    const filtered = items.filter(i => i.toLowerCase().includes(search));
+    if (!filtered.length) return;
+    html += `<tr class="cat-row"><td colspan="6">${cat}</td></tr>`;
+    filtered.forEach(name => {
+      const d   = getItem(name);
+      const q   = d.qty;
+      const thr = d.threshold || 0;
+      const isLow = thr > 0 && q <= thr;
+      if (isLow) lowItems.push(name);
+      const cls = isLow ? 'badge-warn' : (q > 0 ? 'badge-pos' : q < 0 ? 'badge-neg' : 'badge-zero');
+      html += `<tr>
+        <td>${name}</td>
+        <td style="text-align:right"><span class="badge ${cls}">${q}</span></td>
+        <td style="text-align:right;color:var(--red)">${d.totalOut||0}</td>
+        <td style="text-align:right;color:var(--green)">${d.totalIn||0}</td>
+        <td style="text-align:right;color:var(--text-faint)">${thr > 0 ? thr : '—'}</td>
+        <td style="text-align:right;padding-right:10px">
+          <div class="row-actions">
+            <button class="icon-btn" onclick="openEditProduct('${esc(name)}')" title="Edit product">✎</button>
+          </div>
+        </td>
+      </tr>`;
+    });
+  });
+
+  tbody.innerHTML = html || `<tr><td colspan="6" class="empty">No items match</td></tr>`;
+
+  const panel = document.getElementById('low-stock-panel');
+  if (lowItems.length && !search) {
+    panel.style.display = '';
+    document.getElementById('low-stock-list').innerHTML = lowItems.map(n => `<span class="alert-chip">${n}</span>`).join('');
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
+// ─── History ─────────────────────────────────────────────────────────────────
+function renderHistory() {
+  const card    = document.getElementById('history-card');
+  const search  = (document.getElementById('hist-search')?.value || '').toLowerCase();
+  const typeF   = document.getElementById('hist-type')?.value || '';
+
+  let entries = db.log.filter(e => {
+    if (search && !e.item.toLowerCase().includes(search)) return false;
+    if (typeF  && e.type !== typeF) return false;
+    return true;
+  });
+
+  if (!entries.length) {
+    card.innerHTML = '<div class="empty">No entries match</div>';
+    return;
+  }
+
+  const grouped = {};
+  entries.forEach(e => { (grouped[e.date] = grouped[e.date] || []).push(e); });
+
+  let html = '';
+  Object.entries(grouped).sort((a,b) => b[0].localeCompare(a[0])).forEach(([date, dayEntries]) => {
+    html += `<div class="day-group"><div class="day-label">${fmtDate(date)}</div>`;
+    // Sort within day: newest time first
+    dayEntries.sort((a,b) => (b.time||'').localeCompare(a.time||'') || b.ts - a.ts);
+    dayEntries.forEach(e => {
+      const idx  = db.log.indexOf(e);
+      const sign = e.type === 'out' ? '−' : e.type === 'edit' ? '↺' : '+';
+      const cls  = e.type === 'edit' ? 'edit' : e.type;
+      const timeStr = e.time ? fmtTime(e.time) : '—';
+      const noteStr = e.note ? `<span style="color:var(--amber);margin-left:4px">(${e.note})</span>` : '';
+      html += `<div class="log-row">
+        <div style="flex:1;min-width:0">
+          <div class="log-name">${e.item}${noteStr}</div>
+          <div class="log-meta">${e.type === 'edit' ? 'Correction' : e.type === 'out' ? 'Taken out' : 'Added in'} · ${timeStr}</div>
+        </div>
+        <div class="log-right">
+          <div class="log-qty ${cls}">${sign}${e.qty}</div>
+          <button class="icon-btn" onclick="openEditEntry(${idx})" title="Edit entry">✎</button>
+          <button class="icon-btn del" onclick="quickDeleteEntry(${idx})" title="Delete entry">✕</button>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  card.innerHTML = html;
+}
+
+// ─── Settings ────────────────────────────────────────────────────────────────
+function initSettings() {
+  const body = document.getElementById('settings-body');
+  let html = '';
+  Object.entries(CATEGORIES).forEach(([cat, items]) => {
+    if (!items.length) return;
+    html += `<div class="section-head">${cat}</div><div class="settings-grid">`;
+    items.forEach(name => {
+      const d    = getItem(name);
+      const safe = name.replace(/[^a-z0-9]/gi,'_');
+      html += `<div class="setting-row">
+        <span class="setting-label" title="${name}">${name}</span>
+        <div class="setting-inputs">
+          <div><label>On hand</label><input type="number" id="s_qty_${safe}" value="${d.qty}" min="0" step="1"></div>
+          <div><label>Alert ≤</label><input type="number" id="s_thr_${safe}" value="${d.threshold||0}" min="0" step="1"></div>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  body.innerHTML = html;
+}
+
+const modalDirty = { ep: false, ee: false };
+
+function showModalReminder(prefix) {
+  modalDirty[prefix] = true;
+  const el = document.getElementById(prefix + '-save-reminder');
+  if (el) { el.style.display = 'flex'; el.classList.add('shake'); setTimeout(() => el.classList.remove('shake'), 400); }
+}
+
+function hideModalReminder(prefix) {
+  modalDirty[prefix] = false;
+  const el = document.getElementById(prefix + '-save-reminder');
+  if (el) el.style.display = 'none';
+}
+
+function showUnsavedWarning() {
+  const el = document.getElementById('settings-unsaved');
+  if (el) el.style.display = 'flex';
+}
+
+function hideUnsavedWarning() {
+  const el = document.getElementById('settings-unsaved');
+  if (el) el.style.display = 'none';
+}
+
+function saveSettings() {
+  const allItems = Object.values(CATEGORIES).flat();
+  allItems.forEach(name => {
+    const safe  = name.replace(/[^a-z0-9]/gi,'_');
+    const qtyEl = document.getElementById('s_qty_' + safe);
+    const thrEl = document.getElementById('s_thr_' + safe);
+    if (!qtyEl) return;
+    const d      = getItem(name);
+    const newQty = parseInt(qtyEl.value) || 0;
+    const newThr = parseInt(thrEl.value) || 0;
+    if (newQty !== d.qty) {
+      const diff = newQty - d.qty;
+      db.log.unshift({ item: name, type: 'edit', qty: Math.abs(diff), date: todayStr(), time: nowTimeStr(), ts: Date.now(), note: diff > 0 ? 'Correction +' + diff : 'Correction ' + diff });
+    }
+    d.qty       = newQty;
+    d.threshold = newThr;
+  });
+  saveDB();
+  renderInventory();
+  renderHistory();
+  hideUnsavedWarning();
+  toast('Settings saved', 'ok');
+}
+
+function resetAll() {
+  if (!confirm('Reset ALL inventory and log data? This cannot be undone.')) return;
+  db = { inventory: {}, log: [] };
+  saveDB();
+  renderInventory();
+  renderHistory();
+  initSettings();
+  toast('All data reset', 'ok');
+}
+
+// ─── CSV Export ──────────────────────────────────────────────────────────────
+function exportCSV() {
+  const rows = [['Category','Item','Current qty','Total out','Total in','Threshold']];
+  Object.entries(CATEGORIES).forEach(([cat, items]) => {
+    items.forEach(name => {
+      const d = getItem(name);
+      rows.push([cat, name, d.qty, d.totalOut||0, d.totalIn||0, d.threshold||0]);
+    });
+  });
+  const csv  = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `stocktake-${todayStr()}.csv`; a.click();
+  URL.revokeObjectURL(url);
+  toast('CSV downloaded', 'ok');
+}
+
+// ─── Add product modal ────────────────────────────────────────────────────────
+function openModal_addProduct() {
+  populateCatSelect('ap-cat', '');
+  ['ap-name','ap-newcat'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('ap-qty').value = '0';
+  document.getElementById('ap-thr').value = '0';
+  ['ap-name','ap-cat','ap-newcat'].forEach(id => clearFErr(id,'err-' + id));
+  document.getElementById('ap-newcat-wrap').classList.remove('show');
+  openModal('add-product');
+  setTimeout(() => document.getElementById('ap-name').focus(), 60);
+}
+
+function handleAPCatChange() {
+  const v = document.getElementById('ap-cat').value;
+  document.getElementById('ap-newcat-wrap').classList.toggle('show', v === '__new__');
+}
+
+function confirmAddProduct() {
+  const name   = document.getElementById('ap-name').value.trim();
+  const catVal = document.getElementById('ap-cat').value;
+  const newCat = document.getElementById('ap-newcat').value.trim();
+  const qty    = parseInt(document.getElementById('ap-qty').value) || 0;
+  const thr    = parseInt(document.getElementById('ap-thr').value) || 0;
+  let ok = true;
+
+  if (!name) ok = showFErr('ap-name','err-ap-name','Product name is required.');
+  else if (Object.values(CATEGORIES).flat().includes(name)) ok = showFErr('ap-name','err-ap-name','A product with this name already exists.');
+  if (!catVal) ok = showFErr('ap-cat','err-ap-cat','Please choose a category.');
+  if (catVal === '__new__' && !newCat) ok = showFErr('ap-newcat','err-ap-newcat','Enter a new category name.');
+  if (!ok) return;
+
+  const finalCat = catVal === '__new__' ? newCat : catVal;
+  if (!CATEGORIES[finalCat]) CATEGORIES[finalCat] = [];
+  CATEGORIES[finalCat].push(name);
+  db.inventory[name] = { qty, totalOut: 0, totalIn: qty > 0 ? qty : 0, threshold: thr };
+  if (qty > 0) db.log.unshift({ item: name, type: 'in', qty, date: todayStr(), time: nowTimeStr(), ts: Date.now(), note: 'Opening stock' });
+
+  saveDB(); initSelect(); renderInventory(); renderHistory();
+  closeModal('add-product');
+  toast('✓ ' + name + ' added to ' + finalCat, 'ok');
+}
+
+// ─── Edit product modal ───────────────────────────────────────────────────────
+function findCatOf(name) {
+  return Object.entries(CATEGORIES).find(([,items]) => items.includes(name))?.[0] || '';
+}
+
+function openEditProduct(name) {
+  editingProductName = name;
+  const d   = getItem(name);
+  const cat = findCatOf(name);
+
+  document.getElementById('ep-name').value = name;
+  document.getElementById('ep-qty').value  = d.qty;
+  document.getElementById('ep-thr').value  = d.threshold || 0;
+  clearFErr('ep-name','err-ep-name');
+  document.getElementById('ep-newcat-wrap').classList.remove('show');
+  document.getElementById('ep-newcat').value = '';
+  populateCatSelect('ep-cat', cat);
+  hideModalReminder('ep'); modalDirty['ep'] = false;
+  openModal('edit-product');
+  setTimeout(() => document.getElementById('ep-name').focus(), 60);
+}
+
+function handleEPCatChange() {
+  const v = document.getElementById('ep-cat').value;
+  document.getElementById('ep-newcat-wrap').classList.toggle('show', v === '__new__');
+}
+
+function confirmEditProduct() {
+  const oldName = editingProductName;
+  const newName = document.getElementById('ep-name').value.trim();
+  const catVal  = document.getElementById('ep-cat').value;
+  const newCat  = document.getElementById('ep-newcat').value.trim();
+  const newQty  = parseInt(document.getElementById('ep-qty').value) || 0;
+  const newThr  = parseInt(document.getElementById('ep-thr').value) || 0;
+  let ok = true;
+
+  if (!newName) ok = showFErr('ep-name','err-ep-name','Product name is required.');
+  else if (newName !== oldName && Object.values(CATEGORIES).flat().includes(newName))
+    ok = showFErr('ep-name','err-ep-name','A product with this name already exists.');
+  if (catVal === '__new__' && !newCat) ok = showFErr('ep-newcat','err-ep-newcat','Enter a new category name.');
+  if (!ok) return;
+
+  const finalCat = catVal === '__new__' ? newCat : catVal;
+  const oldCat   = findCatOf(oldName);
+  const d        = getItem(oldName);
+  const oldQty   = d.qty;
+
+  // Move/rename in CATEGORIES
+  if (oldCat) CATEGORIES[oldCat] = CATEGORIES[oldCat].filter(i => i !== oldName);
+  if (!CATEGORIES[finalCat]) CATEGORIES[finalCat] = [];
+  if (!CATEGORIES[finalCat].includes(newName)) CATEGORIES[finalCat].push(newName);
+
+  // Move inventory record
+  if (newName !== oldName) {
+    db.inventory[newName] = { ...d };
+    delete db.inventory[oldName];
+  }
+
+  const rec = getItem(newName);
+  rec.qty       = newQty;
+  rec.threshold = newThr;
+
+  // Audit log entry if qty changed
+  if (newQty !== oldQty) {
+    const diff = newQty - oldQty;
+    db.log.unshift({ item: newName, type: 'edit', qty: Math.abs(diff), date: todayStr(), time: nowTimeStr(), ts: Date.now(), note: 'Stock correction ' + (diff > 0 ? '+' + diff : diff) });
+  }
+  if (newName !== oldName) {
+    db.log.unshift({ item: newName, type: 'edit', qty: 0, date: todayStr(), time: nowTimeStr(), ts: Date.now(), note: `Renamed from "${oldName}"` });
+  }
+
+  saveDB(); initSelect(); renderInventory(); renderHistory(); initSettings();
+  hideModalReminder('ep');
+  closeModal('edit-product');
+  toast('✓ ' + newName + ' updated', 'ok');
+}
+
+function confirmDeleteProduct() {
+  const name = editingProductName;
+  if (!confirm(`Delete "${name}"? This removes it from the product list. History entries for this item will remain.`)) return;
+
+  const cat = findCatOf(name);
+  if (cat) CATEGORIES[cat] = CATEGORIES[cat].filter(i => i !== name);
+  delete db.inventory[name];
+
+  saveDB(); initSelect(); renderInventory(); renderHistory(); initSettings();
+  hideModalReminder('ep');
+  closeModal('edit-product');
+  toast(name + ' removed', 'ok');
+}
+
+// ─── Edit history entry modal ─────────────────────────────────────────────────
+function setEEType(t) {
+  eeType = t;
+  document.getElementById('ee-btn-out').className = 'type-btn ' + (t === 'out' ? 'out-active' : 'out-idle');
+  document.getElementById('ee-btn-in').className  = 'type-btn ' + (t === 'in'  ? 'in-active'  : 'in-idle');
+}
+
+function openEditEntry(idx) {
+  editingEntryIndex = idx;
+  const e = db.log[idx];
+  document.getElementById('ee-item').value = e.item;
+  document.getElementById('ee-qty').value  = e.qty;
+  document.getElementById('ee-date').value = e.date;
+  document.getElementById('ee-time').value = e.time || '';
+  clearFErr('ee-qty','err-ee-qty');
+  const t = e.type === 'edit' ? 'in' : e.type;
+  setEEType(t);
+  hideModalReminder('ee'); modalDirty['ee'] = false;
+  openModal('edit-entry');
+  setTimeout(() => document.getElementById('ee-qty').focus(), 60);
+}
+
+function confirmEditEntry() {
+  const idx    = editingEntryIndex;
+  const e      = db.log[idx];
+  const newQty = parseInt(document.getElementById('ee-qty').value) || 0;
+  const newDate= document.getElementById('ee-date').value;
+  const newTime= document.getElementById('ee-time').value;
+
+  if (!newQty || newQty < 1) { showFErr('ee-qty','err-ee-qty','Quantity must be at least 1.'); return; }
+
+  const oldQty  = e.qty;
+  const oldType = e.type === 'edit' ? 'in' : e.type;
+  const newType = eeType;
+
+  // Reverse old effect on inventory
+  const inv = getItem(e.item);
+  if (oldType === 'out') { inv.qty += oldQty; inv.totalOut = Math.max(0,(inv.totalOut||0) - oldQty); }
+  else                   { inv.qty -= oldQty; inv.totalIn  = Math.max(0,(inv.totalIn||0)  - oldQty); }
+
+  // Apply new effect
+  if (newType === 'out') { inv.qty -= newQty; inv.totalOut = (inv.totalOut||0) + newQty; }
+  else                   { inv.qty += newQty; inv.totalIn  = (inv.totalIn||0)  + newQty; }
+
+  // Add audit entry
+  db.log.unshift({ item: e.item, type: 'edit', qty: newQty, date: todayStr(), time: nowTimeStr(), ts: Date.now(), note: `Edited entry from ${oldType} ${oldQty} → ${newType} ${newQty}` });
+
+  // Update the original entry
+  e.type = newType; e.qty = newQty; e.date = newDate; e.time = newTime;
+
+  saveDB(); renderInventory(); renderHistory();
+  hideModalReminder('ee');
+  closeModal('edit-entry');
+  toast('Entry updated', 'ok');
+}
+
+function confirmDeleteEntry() {
+  const idx = editingEntryIndex;
+  const e   = db.log[idx];
+  if (!confirm(`Delete this entry (${e.type} ${e.qty} × ${e.item})? Inventory will be adjusted.`)) return;
+
+  // Reverse the entry's effect on inventory
+  const inv     = getItem(e.item);
+  const eType   = e.type === 'edit' ? null : e.type; // edits don't affect totals
+  if (eType === 'out') { inv.qty += e.qty; inv.totalOut = Math.max(0,(inv.totalOut||0) - e.qty); }
+  if (eType === 'in')  { inv.qty -= e.qty; inv.totalIn  = Math.max(0,(inv.totalIn||0)  - e.qty); }
+
+  db.log.splice(idx, 1);
+  saveDB(); renderInventory(); renderHistory();
+  hideModalReminder('ee');
+  closeModal('edit-entry');
+  toast('Entry deleted', 'ok');
+}
+
+function quickDeleteEntry(idx) {
+  const e = db.log[idx];
+  if (!confirm(`Delete this entry (${e.type} ${e.qty} × ${e.item})?`)) return;
+  const inv   = getItem(e.item);
+  const eType = e.type === 'edit' ? null : e.type;
+  if (eType === 'out') { inv.qty += e.qty; inv.totalOut = Math.max(0,(inv.totalOut||0) - e.qty); }
+  if (eType === 'in')  { inv.qty -= e.qty; inv.totalIn  = Math.max(0,(inv.totalIn||0)  - e.qty); }
+  db.log.splice(idx, 1);
+  saveDB(); renderInventory(); renderHistory();
+  toast('Entry deleted', 'ok');
+}
+
+// ─── Tabs ────────────────────────────────────────────────────────────────────
+function showTab(t) {
+  ['log','inventory','history','settings'].forEach((id, i) => {
+    document.getElementById('tab-' + id).style.display = id === t ? '' : 'none';
+    document.querySelectorAll('.nav-btn')[i].className = 'nav-btn' + (id === t ? ' active' : '');
+  });
+  if (t === 'inventory') renderInventory();
+  if (t === 'history')   renderHistory();
+  if (t === 'settings')  { initSettings(); hideUnsavedWarning(); }
+}
+
+// ─── Escape helper for inline onclick ────────────────────────────────────────
+function esc(s) { return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+
+// ─── Boot ────────────────────────────────────────────────────────────────────
+loadDB();
+initSelect();
+renderInventory();
+renderHistory();
+document.getElementById('header-date').textContent = new Date().toLocaleDateString('en-ZA', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+</script>
+</body>
+</html>
