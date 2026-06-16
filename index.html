@@ -1090,15 +1090,17 @@ function importFileSelected(event) {
         const wb = XLSX.read(e.target.result, { type: 'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         processImportData(XLSX.utils.sheet_to_json(ws, { defval: '' }));
-      } catch(err) { toast('Could not read Excel file', 'err'); }
+      } catch(err) { showImportError('Could not read the Excel file. Make sure it is a valid .xlsx file.'); }
     };
     reader.readAsArrayBuffer(file);
   } else {
-    toast('Please select a .csv or .xlsx file', 'err');
+    showImportError('Please select a .csv or .xlsx file.');
   }
 }
 
 function parseCSVToRows(text) {
+  // strip BOM that Excel adds when re-saving CSV files
+  text = text.replace(/^﻿/, '');
   const lines = text.trim().split(/\r?\n/);
   if (lines.length < 2) return [];
   function splitLine(line) {
@@ -1112,7 +1114,7 @@ function parseCSVToRows(text) {
     cells.push(cur);
     return cells;
   }
-  const headers = splitLine(lines[0]);
+  const headers = splitLine(lines[0]).map(h => h.trim());
   return lines.slice(1).filter(l => l.trim()).map(line => {
     const vals = splitLine(line);
     const obj = {};
@@ -1137,16 +1139,28 @@ function findCol(row, keywords) {
   return null;
 }
 
+function showImportError(msg) {
+  document.getElementById('import-summary').innerHTML = '';
+  document.getElementById('import-warnings').style.display = '';
+  document.getElementById('import-warnings').innerHTML =
+    `<div style="background:var(--red-bg);border:1px solid var(--red-border);border-radius:var(--radius);padding:10px 13px;font-size:13px;color:var(--red)">${msg}</div>`;
+  document.getElementById('import-preview-table').style.display = 'none';
+  document.getElementById('import-preview-body').innerHTML = '';
+  document.getElementById('import-no-changes').style.display = 'none';
+  document.getElementById('import-confirm-btn').disabled = true;
+  openModal('import');
+}
+
 function processImportData(rows) {
-  if (!rows.length) { toast('File is empty or unreadable', 'err'); return; }
+  if (!rows.length) { showImportError('File is empty or could not be read.'); return; }
   const sample = rows[0];
   const itemCol = findCol(sample, ['Item', 'Name', 'Product', 'Product name', 'Description']);
   const qtyCol  = findCol(sample, ['Current qty', 'Qty', 'Quantity', 'Stock', 'On hand', 'Current stock', 'Amount']);
   const thrCol  = findCol(sample, ['Threshold', 'Alert', 'Alert at', 'Min', 'Minimum']);
 
   if (!itemCol || !qtyCol) {
-    const colList = Object.keys(sample).join(', ') || '(none)';
-    toast(`Columns found: ${colList} — rename to "Item" and "Qty"`, 'err');
+    const colList = Object.keys(sample).map(k => `<strong>${k}</strong>`).join(', ') || '(none)';
+    showImportError(`Could not find Item and Qty columns.<br>Columns detected in your file: ${colList}<br><br>Rename the product column to <strong>Item</strong> and the quantity column to <strong>Qty</strong> or <strong>Current qty</strong>.`);
     return;
   }
 
