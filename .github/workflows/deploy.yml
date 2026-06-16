@@ -1,0 +1,41 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main, develop]
+
+permissions:
+  contents: write
+
+jobs:
+  deploy-main:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare files
+        run: mkdir _deploy && cp index.html logo.png _deploy/
+      - uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: _deploy
+          target-folder: /
+          clean-exclude: dev
+          git-config-name: GitHub Actions
+          git-config-email: actions@github.com
+
+  deploy-develop:
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare files
+        run: mkdir _deploy && cp index.html logo.png _deploy/
+      - uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: _deploy
+          target-folder: dev
+          clean: false
+          git-config-name: GitHub Actions
+          git-config-email: actions@github.com
