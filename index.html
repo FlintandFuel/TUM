@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Coffee Shop — Stock Take</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
   :root {
     --bg: #faf9f7; --surface: #ffffff; --border: #e8e4dc; --border-strong: #ccc8be;
@@ -171,7 +173,10 @@
     <div class="app-logo-placeholder" id="logo-placeholder" style="display:none" title="Add logo.png to the same folder as this file">Logo</div>
     <h1>Coffee Shop — Stock Take</h1>
   </div>
-  <span class="date-chip" id="header-date"></span>
+  <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+    <span id="sync-status" style="font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.7);display:none"></span>
+    <span class="date-chip" id="header-date"></span>
+  </div>
 </div>
 <nav class="nav">
   <button class="nav-btn active" onclick="showTab('log')">Log stock</button>
@@ -484,19 +489,71 @@ let editingProductName = null;   // for edit-product modal
 let editingEntryIndex  = null;   // for edit-entry modal
 let eeType = 'out';              // type inside edit-entry modal
 
+// ─── Firebase config ──────────────────────────────────────────────────────────
+// Paste your Firebase config here. Get it from:
+// Firebase Console → Project Settings → Your apps → Config
+const FIREBASE_CONFIG = null;
+// const FIREBASE_CONFIG = {
+//   apiKey: "...",
+//   authDomain: "...",
+//   databaseURL: "https://YOUR-PROJECT-default-rtdb.firebaseio.com",
+//   projectId: "...",
+//   storageBucket: "...",
+//   messagingSenderId: "...",
+//   appId: "..."
+// };
+
 // ─── Persistence ─────────────────────────────────────────────────────────────
+let fbRef = null;
+let fbIgnoreNext = false;
+
+function setSyncStatus(state) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  const map = { connecting: ['⟳ Syncing…', ''], connected: ['⬤ Live sync', 'color:rgba(100,255,150,0.9)'], offline: ['◌ Offline', ''] };
+  const [text, style] = map[state] || ['', ''];
+  el.textContent = text; el.style.cssText = `font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(255,255,255,0.15);${style}`;
+  el.style.display = text ? '' : 'none';
+}
+
+function applyDBData(data) {
+  if (!data) return;
+  db = data;
+  if (db.customCategories) {
+    Object.entries(db.customCategories).forEach(([cat, items]) => {
+      if (!CATEGORIES[cat]) CATEGORIES[cat] = [];
+      items.forEach(i => { if (!CATEGORIES[cat].includes(i)) CATEGORIES[cat].push(i); });
+    });
+  }
+}
+
+function initFirebase() {
+  if (!FIREBASE_CONFIG || !window.firebase) return;
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    fbRef = firebase.database().ref('stocktake');
+    setSyncStatus('connecting');
+    fbRef.on('value', snapshot => {
+      if (fbIgnoreNext) { fbIgnoreNext = false; return; }
+      const data = snapshot.val();
+      if (data) {
+        applyDBData(data);
+        try { localStorage.setItem('coffee-stocktake-v3', JSON.stringify(db)); } catch(e) {}
+        initSelect(); renderInventory(); renderHistory();
+        if (document.getElementById('tab-settings').style.display !== 'none') initSettings();
+      }
+      setSyncStatus('connected');
+    }, () => setSyncStatus('offline'));
+    firebase.database().ref('.info/connected').on('value', s => {
+      if (s.val() === false) setSyncStatus('offline');
+    });
+  } catch(e) { console.error('Firebase init error:', e); }
+}
+
 function loadDB() {
   try {
     const raw = localStorage.getItem('coffee-stocktake-v3');
-    if (raw) {
-      db = JSON.parse(raw);
-      if (db.customCategories) {
-        Object.entries(db.customCategories).forEach(([cat, items]) => {
-          if (!CATEGORIES[cat]) CATEGORIES[cat] = [];
-          items.forEach(i => { if (!CATEGORIES[cat].includes(i)) CATEGORIES[cat].push(i); });
-        });
-      }
-    }
+    if (raw) applyDBData(JSON.parse(raw));
   } catch(e) {}
 }
 
@@ -509,6 +566,7 @@ function saveDB() {
     });
     db.customCategories = customCategories;
     localStorage.setItem('coffee-stocktake-v3', JSON.stringify(db));
+    if (fbRef) { fbIgnoreNext = true; fbRef.set(db); }
   } catch(e) {}
 }
 
@@ -1282,6 +1340,7 @@ loadDB();
 initSelect();
 renderInventory();
 renderHistory();
+initFirebase();
 document.getElementById('header-date').textContent = new Date().toLocaleDateString('en-ZA', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 </script>
 </body>
