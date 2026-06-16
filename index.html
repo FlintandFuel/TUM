@@ -223,7 +223,7 @@
       <input class="search-input" type="text" placeholder="Search items…" oninput="renderInventory()">
       <button class="tool-btn" onclick="exportCSV()">⬇ Export CSV</button>
       <button class="tool-btn" onclick="document.getElementById('import-file-input').click()">⬆ Import</button>
-      <input type="file" id="import-file-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="importFileSelected(event)">
+      <input type="file" id="import-file-input" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" style="display:none" onchange="importFileSelected(event)">
     </div>
     <div class="card" style="padding:0;overflow:hidden">
       <table class="inv-table">
