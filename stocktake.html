@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Coffee Shop — Stock Take</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root {
     --bg: #faf9f7; --surface: #ffffff; --border: #e8e4dc; --border-strong: #ccc8be;
@@ -221,6 +222,8 @@
     <div class="toolbar">
       <input class="search-input" type="text" placeholder="Search items…" oninput="renderInventory()">
       <button class="tool-btn" onclick="exportCSV()">⬇ Export CSV</button>
+      <button class="tool-btn" onclick="document.getElementById('import-file-input').click()">⬆ Import</button>
+      <input type="file" id="import-file-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="importFileSelected(event)">
     </div>
     <div class="card" style="padding:0;overflow:hidden">
       <table class="inv-table">
@@ -417,6 +420,40 @@
       <button class="danger-btn" onclick="confirmDeleteEntry()">Delete</button>
       <button class="cancel-btn" onclick="modalDirty['ee'] ? showModalReminder('ee') : closeModal('edit-entry')">Cancel</button>
       <button class="confirm-btn" onclick="confirmEditEntry()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════
+     MODAL: Import stock
+═══════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="modal-import" onclick="handleBdClick(event,'import')">
+  <div class="modal" role="dialog" aria-modal="true" style="max-width:580px">
+    <div class="modal-header">
+      <span class="modal-title">Import stock update</span>
+      <button class="modal-close" onclick="closeModal('import')" aria-label="Close">×</button>
+    </div>
+    <p style="font-size:12px;color:var(--text-faint);margin-bottom:10px">Accepts the exported CSV or any Excel/CSV with <em>Item</em> and <em>Qty</em> columns. Only matched items are updated.</p>
+    <div id="import-summary" style="margin-bottom:10px;font-size:13px;color:var(--text-muted)"></div>
+    <div id="import-warnings" style="display:none;margin-bottom:10px"></div>
+    <div style="overflow-x:auto;max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius)">
+      <table class="inv-table" id="import-preview-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th style="text-align:right">Current</th>
+            <th style="text-align:right">New qty</th>
+            <th style="text-align:right">Change</th>
+            <th style="text-align:right">Alert</th>
+          </tr>
+        </thead>
+        <tbody id="import-preview-body"></tbody>
+      </table>
+    </div>
+    <div id="import-no-changes" style="display:none" class="empty">No changes detected — all quantities already match.</div>
+    <div class="modal-footer">
+      <button class="cancel-btn" onclick="closeModal('import')">Cancel</button>
+      <button class="confirm-btn" id="import-confirm-btn" onclick="confirmBulkImport()">Apply changes</button>
     </div>
   </div>
 </div>
@@ -1032,6 +1069,158 @@ function quickDeleteEntry(idx) {
   db.log.splice(idx, 1);
   saveDB(); renderInventory(); renderHistory();
   toast('Entry deleted', 'ok');
+}
+
+// ─── Import (CSV / Excel) ─────────────────────────────────────────────────────
+let importRows = [];
+
+function importFileSelected(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'csv') {
+    const reader = new FileReader();
+    reader.onload = e => processImportData(parseCSVToRows(e.target.result));
+    reader.readAsText(file);
+  } else if (ext === 'xlsx' || ext === 'xls') {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        processImportData(XLSX.utils.sheet_to_json(ws, { defval: '' }));
+      } catch(err) { toast('Could not read Excel file', 'err'); }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    toast('Please select a .csv or .xlsx file', 'err');
+  }
+}
+
+function parseCSVToRows(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  function splitLine(line) {
+    const cells = []; let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQ = !inQ; }
+      else if (c === ',' && !inQ) { cells.push(cur); cur = ''; }
+      else { cur += c; }
+    }
+    cells.push(cur);
+    return cells;
+  }
+  const headers = splitLine(lines[0]);
+  return lines.slice(1).filter(l => l.trim()).map(line => {
+    const vals = splitLine(line);
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (vals[i] || '').trim(); });
+    return obj;
+  });
+}
+
+function findCol(row, ...candidates) {
+  const keys = Object.keys(row);
+  for (const c of candidates) {
+    const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
+    const found = keys.find(k => norm(k) === norm(c));
+    if (found !== undefined) return found;
+  }
+  return null;
+}
+
+function processImportData(rows) {
+  if (!rows.length) { toast('File is empty or unreadable', 'err'); return; }
+  const sample = rows[0];
+  const itemCol = findCol(sample, 'Item', 'Name', 'Product', 'Product name');
+  const qtyCol  = findCol(sample, 'Current qty', 'Qty', 'Quantity', 'Stock', 'On hand', 'Current stock');
+  const thrCol  = findCol(sample, 'Threshold', 'Alert', 'Alert at', 'Min', 'Minimum');
+
+  if (!itemCol || !qtyCol) {
+    toast('Could not find Item and Qty columns in file', 'err');
+    return;
+  }
+
+  const allItems = Object.values(CATEGORIES).flat();
+  const matched = [], unmatched = [];
+
+  rows.forEach(row => {
+    const name   = String(row[itemCol] || '').trim();
+    const newQty = parseInt(row[qtyCol]);
+    const newThr = thrCol ? parseInt(row[thrCol]) : null;
+    if (!name) return;
+    if (!allItems.includes(name)) { unmatched.push(name); return; }
+    const cur = getItem(name);
+    matched.push({
+      name,
+      oldQty: cur.qty,
+      newQty: isNaN(newQty) ? cur.qty : newQty,
+      oldThr: cur.threshold || 0,
+      newThr: (newThr !== null && !isNaN(newThr)) ? newThr : (cur.threshold || 0)
+    });
+  });
+
+  importRows = matched.filter(r => r.newQty !== r.oldQty || r.newThr !== r.oldThr);
+
+  document.getElementById('import-summary').innerHTML =
+    `<strong>${matched.length}</strong> items matched &nbsp;·&nbsp; <strong>${importRows.length}</strong> will be updated &nbsp;·&nbsp; <strong>${unmatched.length}</strong> not found`;
+
+  const warnEl = document.getElementById('import-warnings');
+  if (unmatched.length) {
+    warnEl.style.display = '';
+    warnEl.innerHTML = `<div style="background:var(--amber-bg);border:1px solid var(--amber-border);border-radius:var(--radius);padding:9px 12px;font-size:12px;color:var(--amber)"><strong>Skipped (not in product list):</strong> ${unmatched.slice(0,8).join(', ')}${unmatched.length > 8 ? ` +${unmatched.length - 8} more` : ''}</div>`;
+  } else {
+    warnEl.style.display = 'none';
+  }
+
+  const tbody  = document.getElementById('import-preview-body');
+  const noChg  = document.getElementById('import-no-changes');
+  const table  = document.getElementById('import-preview-table');
+  const btnCfm = document.getElementById('import-confirm-btn');
+
+  if (!importRows.length) {
+    tbody.innerHTML = ''; noChg.style.display = ''; table.style.display = 'none'; btnCfm.disabled = true;
+  } else {
+    noChg.style.display = 'none'; table.style.display = ''; btnCfm.disabled = false;
+    tbody.innerHTML = importRows.map(r => {
+      const diff = r.newQty - r.oldQty;
+      const diffStr   = diff === 0 ? '—' : (diff > 0 ? '+' + diff : String(diff));
+      const diffColor = diff > 0 ? 'var(--green)' : diff < 0 ? 'var(--red)' : 'var(--text-faint)';
+      const thrChanged = r.newThr !== r.oldThr;
+      const thrStr = thrChanged
+        ? `<span style="color:var(--amber)">${r.oldThr}→${r.newThr}</span>`
+        : (r.newThr > 0 ? r.newThr : '—');
+      return `<tr>
+        <td>${r.name}</td>
+        <td style="text-align:right;color:var(--text-muted)">${r.oldQty}</td>
+        <td style="text-align:right;font-weight:600">${r.newQty}</td>
+        <td style="text-align:right;color:${diffColor};font-weight:600">${diffStr}</td>
+        <td style="text-align:right">${thrStr}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  openModal('import');
+}
+
+function confirmBulkImport() {
+  if (!importRows.length) { closeModal('import'); return; }
+  importRows.forEach(r => {
+    const inv = getItem(r.name);
+    if (r.newQty !== r.oldQty) {
+      const diff = r.newQty - r.oldQty;
+      db.log.unshift({ item: r.name, type: 'edit', qty: Math.abs(diff), date: todayStr(), time: nowTimeStr(), ts: Date.now(), note: `Bulk import: ${diff > 0 ? '+' : ''}${diff}` });
+    }
+    inv.qty = r.newQty;
+    inv.threshold = r.newThr;
+  });
+  saveDB(); renderInventory(); renderHistory(); initSettings();
+  const count = importRows.length;
+  importRows = [];
+  closeModal('import');
+  toast(`${count} item${count !== 1 ? 's' : ''} updated`, 'ok');
 }
 
 // ─── Tabs ────────────────────────────────────────────────────────────────────
