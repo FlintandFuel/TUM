@@ -1165,14 +1165,17 @@ function processImportData(rows) {
   }
 
   const allItems = Object.values(CATEGORIES).flat();
+  const itemLookup = {};
+  allItems.forEach(i => { itemLookup[i.toLowerCase().trim()] = i; });
   const matched = [], unmatched = [];
 
   rows.forEach(row => {
-    const name   = String(row[itemCol] || '').trim();
-    const newQty = parseInt(row[qtyCol]);
-    const newThr = thrCol ? parseInt(row[thrCol]) : null;
-    if (!name) return;
-    if (!allItems.includes(name)) { unmatched.push(name); return; }
+    const rawName = String(row[itemCol] || '').trim();
+    const name    = itemLookup[rawName.toLowerCase()] || null;
+    const newQty  = parseInt(row[qtyCol]);
+    const newThr  = thrCol ? parseInt(row[thrCol]) : null;
+    if (!rawName) return;
+    if (!name) { unmatched.push(rawName); return; }
     const cur = getItem(name);
     matched.push({
       name,
