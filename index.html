@@ -221,6 +221,7 @@
     </div>
     <div class="toolbar">
       <input class="search-input" type="text" placeholder="Search items…" oninput="renderInventory()">
+      <button class="tool-btn" onclick="exportExcel()">⬇ Export Excel</button>
       <button class="tool-btn" onclick="exportCSV()">⬇ Export CSV</button>
       <button class="tool-btn" onclick="document.getElementById('import-file-input').click()">⬆ Import</button>
       <input type="file" id="import-file-input" style="display:none" onchange="importFileSelected(event)">
@@ -834,7 +835,22 @@ function resetAll() {
   toast('All data reset', 'ok');
 }
 
-// ─── CSV Export ──────────────────────────────────────────────────────────────
+// ─── Export ───────────────────────────────────────────────────────────────────
+function exportExcel() {
+  const rows = [['Category','Item','Current qty','Total out','Total in','Threshold']];
+  Object.entries(CATEGORIES).forEach(([cat, items]) => {
+    items.forEach(name => {
+      const d = getItem(name);
+      rows.push([cat, name, d.qty, d.totalOut||0, d.totalIn||0, d.threshold||0]);
+    });
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Stock');
+  XLSX.writeFile(wb, `stocktake-${todayStr()}.xlsx`);
+  toast('Excel file downloaded', 'ok');
+}
+
 function exportCSV() {
   const rows = [['Category','Item','Current qty','Total out','Total in','Threshold']];
   Object.entries(CATEGORIES).forEach(([cat, items]) => {
