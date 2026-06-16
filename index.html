@@ -1121,11 +1121,17 @@ function parseCSVToRows(text) {
   });
 }
 
-function findCol(row, ...candidates) {
+function findCol(row, keywords) {
+  const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
   const keys = Object.keys(row);
-  for (const c of candidates) {
-    const norm = s => s.toLowerCase().replace(/[^a-z]/g, '');
+  // exact match first
+  for (const c of keywords) {
     const found = keys.find(k => norm(k) === norm(c));
+    if (found !== undefined) return found;
+  }
+  // partial/contains match fallback
+  for (const c of keywords) {
+    const found = keys.find(k => norm(k).includes(norm(c)) || norm(c).includes(norm(k)));
     if (found !== undefined) return found;
   }
   return null;
@@ -1134,12 +1140,13 @@ function findCol(row, ...candidates) {
 function processImportData(rows) {
   if (!rows.length) { toast('File is empty or unreadable', 'err'); return; }
   const sample = rows[0];
-  const itemCol = findCol(sample, 'Item', 'Name', 'Product', 'Product name');
-  const qtyCol  = findCol(sample, 'Current qty', 'Qty', 'Quantity', 'Stock', 'On hand', 'Current stock');
-  const thrCol  = findCol(sample, 'Threshold', 'Alert', 'Alert at', 'Min', 'Minimum');
+  const itemCol = findCol(sample, ['Item', 'Name', 'Product', 'Product name', 'Description']);
+  const qtyCol  = findCol(sample, ['Current qty', 'Qty', 'Quantity', 'Stock', 'On hand', 'Current stock', 'Amount']);
+  const thrCol  = findCol(sample, ['Threshold', 'Alert', 'Alert at', 'Min', 'Minimum']);
 
   if (!itemCol || !qtyCol) {
-    toast('Could not find Item and Qty columns in file', 'err');
+    const colList = Object.keys(sample).join(', ') || '(none)';
+    toast(`Columns found: ${colList} — rename to "Item" and "Qty"`, 'err');
     return;
   }
 
