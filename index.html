@@ -1414,17 +1414,18 @@ renderHistory();
 document.getElementById('header-date').textContent = new Date().toLocaleDateString('en-ZA', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 
 if (FIREBASE_CONFIG && window.firebase) {
-  firebase.initializeApp(FIREBASE_CONFIG);
-  firebase.database().setPersistenceEnabled(true);
-  showLogin();
-  firebase.auth().onAuthStateChanged(user => {
-    if (user) {
-      showApp(user);
-      initFirebase();
-    } else {
-      showLogin();
-    }
-  });
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    try { firebase.database().setPersistenceEnabled(true); } catch(e) {}
+    showLogin();
+    firebase.auth().onAuthStateChanged(user => {
+      if (user) { showApp(user); initFirebase(); }
+      else showLogin();
+    });
+  } catch(e) {
+    console.error('Firebase init error:', e);
+    document.getElementById('app-shell').style.display = '';
+  }
 } else {
   document.getElementById('app-shell').style.display = '';
   initFirebase();
