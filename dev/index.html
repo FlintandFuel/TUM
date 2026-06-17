@@ -582,7 +582,7 @@ function initFirebase() {
       setSyncStatus('connected');
     }, () => setSyncStatus('offline'));
     firebase.database().ref('.info/connected').on('value', s => {
-      if (s.val() === false) setSyncStatus('offline');
+      setSyncStatus(s.val() === true ? 'connected' : 'offline');
     });
   } catch(e) { console.error('Firebase init error:', e); }
 }
