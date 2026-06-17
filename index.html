@@ -548,7 +548,7 @@ let fbIgnoreNext = false;
 function setSyncStatus(state) {
   const el = document.getElementById('sync-status');
   if (!el) return;
-  const map = { connecting: ['⟳ Syncing…', ''], connected: ['⬤ Live sync', 'color:rgba(100,255,150,0.9)'], offline: ['◌ Offline', ''] };
+  const map = { connecting: ['⟳ Syncing…', ''], connected: ['⬤ Live sync', 'color:rgba(100,255,150,0.9)'], offline: ['◌ Offline — changes queued', ''] };
   const [text, style] = map[state] || ['', ''];
   el.textContent = text; el.style.cssText = `font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(255,255,255,0.15);${style}`;
   el.style.display = text ? '' : 'none';
@@ -582,7 +582,7 @@ function initFirebase() {
       setSyncStatus('connected');
     }, () => setSyncStatus('offline'));
     firebase.database().ref('.info/connected').on('value', s => {
-      if (s.val() === false) setSyncStatus('offline');
+      setSyncStatus(s.val() === true ? 'connected' : 'offline');
     });
   } catch(e) { console.error('Firebase init error:', e); }
 }
@@ -1414,16 +1414,18 @@ renderHistory();
 document.getElementById('header-date').textContent = new Date().toLocaleDateString('en-ZA', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 
 if (FIREBASE_CONFIG && window.firebase) {
-  firebase.initializeApp(FIREBASE_CONFIG);
-  showLogin();
-  firebase.auth().onAuthStateChanged(user => {
-    if (user) {
-      showApp(user);
-      initFirebase();
-    } else {
-      showLogin();
-    }
-  });
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    try { firebase.database().setPersistenceEnabled(true); } catch(e) {}
+    showLogin();
+    firebase.auth().onAuthStateChanged(user => {
+      if (user) { showApp(user); initFirebase(); }
+      else showLogin();
+    });
+  } catch(e) {
+    console.error('Firebase init error:', e);
+    document.getElementById('app-shell').style.display = '';
+  }
 } else {
   document.getElementById('app-shell').style.display = '';
   initFirebase();
