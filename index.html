@@ -548,7 +548,7 @@ let fbIgnoreNext = false;
 function setSyncStatus(state) {
   const el = document.getElementById('sync-status');
   if (!el) return;
-  const map = { connecting: ['⟳ Syncing…', ''], connected: ['⬤ Live sync', 'color:rgba(100,255,150,0.9)'], offline: ['◌ Offline', ''] };
+  const map = { connecting: ['⟳ Syncing…', ''], connected: ['⬤ Live sync', 'color:rgba(100,255,150,0.9)'], offline: ['◌ Offline — changes queued', ''] };
   const [text, style] = map[state] || ['', ''];
   el.textContent = text; el.style.cssText = `font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(255,255,255,0.15);${style}`;
   el.style.display = text ? '' : 'none';
@@ -1415,6 +1415,7 @@ document.getElementById('header-date').textContent = new Date().toLocaleDateStri
 
 if (FIREBASE_CONFIG && window.firebase) {
   firebase.initializeApp(FIREBASE_CONFIG);
+  firebase.database().setPersistenceEnabled(true);
   showLogin();
   firebase.auth().onAuthStateChanged(user => {
     if (user) {
